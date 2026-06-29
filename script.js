@@ -104,3 +104,49 @@ export default function SmoothNavBar() {
     </nav>
   );
 }
+import React from 'react';
+import { motion } from 'framer-motion';
+
+const navContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1, // Delays each link's appearance slightly
+      delayChildren: 0.2
+    }
+  }
+};
+
+const navItemVariants = {
+  hidden: { opacity: 0, y: -15 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { type: "spring", stiffness: 120, damping: 14 } 
+  }
+};
+
+export default function AnimatedNav() {
+  const links = ['Overview', 'Browse Library', 'Top Writers', 'Settings'];
+
+  return (
+    <motion.nav 
+      variants={navContainerVariants}
+      initial="hidden"
+      animate="visible"
+      className="flex items-center gap-6"
+    >
+      {links.map((link) => (
+        <motion.a
+          key={link}
+          variants={navItemVariants}
+          href="#"
+          className="text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors py-2"
+        >
+          {link}
+        </motion.a>
+      ))}
+    </motion.nav>
+  );
+}
