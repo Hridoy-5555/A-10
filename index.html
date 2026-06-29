@@ -3,110 +3,910 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>InkShare - Discover & Read Original Ebooks</title>
+    <title>Fable - Ebook Sharing Platform Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         [x-cloak] { display: none !important; }
-        .smooth-transition { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .skeleton-shimmer {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-900 font-sans antialiased" x-data="{ 
-    currentTab: 'home', 
-    mobileMenuOpen: false, 
-    authModalOpen: false, 
-    authMode: 'login', 
-    roleSelectionOpen: false,
-    isLoggedIn: false,
-    userRole: 'Guest',
-    searchQuery: '',
-    genreFilter: 'All',
-    sortBy: 'latest'
-}">
+<body class="bg-slate-50 text-slate-900 transition-colors duration-200" :class="darkMode ? 'dark bg-slate-950 text-slate-100' : ''" x-data="fableEngine()" x-init="initPlatform()">
 
-    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
-                <div class="flex-shrink-0 flex items-center cursor-pointer" @click="currentTab = 'home'">
-                    <i data-lucide="book-open" class="h-8 w-8 text-indigo-600 mr-2"></i>
-                    <span class="font-bold text-xl tracking-tight bg-gradient-to-r gold from-indigo-600 to-purple-600 bg-clip-text text-transparent">InkShare</span>
-                </div>
-
-                <div class="hidden md:flex items-center space-x-8">
-                    <button @click="currentTab = 'home'" :class="currentTab === 'home' ? 'text-indigo-600 font-semibold border-b-2 border-indigo-600' : 'text-gray-600 hover:text-indigo-600'" class="pb-1 transition-colors">Home</button>
-                    <button @click="currentTab = 'browse'" :class="currentTab === 'browse' ? 'text-indigo-600 font-semibold border-b-2 border-indigo-600' : 'text-gray-600 hover:text-indigo-600'" class="pb-1 transition-colors">Browse Ebooks</button>
-                    <button x-show="isLoggedIn" @click="currentTab = 'dashboard'" :class="currentTab === 'dashboard' ? 'text-indigo-600 font-semibold border-b-2 border-indigo-600' : 'text-gray-600 hover:text-indigo-600'" class="pb-1 transition-colors" x-cloak>Dashboard</button>
-                </div>
-
-                <div class="hidden md:flex items-center space-x-4">
-                    <template x-if="!isLoggedIn">
-                        <div class="flex items-center space-x-3">
-                            <button @click="authMode = 'login'; authModalOpen = true" class="text-sm font-medium text-gray-700 hover:text-indigo-600 transition">Log in</button>
-                            <button @click="authMode = 'register'; authModalOpen = true" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition">Sign up</button>
-                        </div>
-                    </template>
-                    <template x-if="isLoggedIn">
-                        <div class="flex items-center space-x-4">
-                            <span class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-medium border border-indigo-100" x-text="`Role: ${userRole}`"></span>
-                            <button @click="isLoggedIn = false; userRole = 'Guest'; currentTab = 'home'" class="flex items-center text-sm font-medium text-red-600 hover:text-red-700 transition">
-                                <i data-lucide="log-out" class="w-4 h-4 mr-1"></i> Logout
-                            </button>
-                        </div>
-                    </template>
-                </div>
-
-                <div class="flex md:hidden">
-                    <button @click="mobileMenuOpen = !mobileMenuOpen" class="text-gray-600 hover:text-gray-900 focus:outline-none">
-                        <i data-lucide="menu" x-show="!mobileMenuOpen" class="h-6 w-6"></i>
-                        <i data-lucide="x" x-show="mobileMenuOpen" class="h-6 w-6" x-cloak></i>
-                    </button>
-                </div>
+    <div class="fixed bottom-6 right-6 z-50 space-y-3 pointer-events-none">
+        <template x-for="toast in toasts" :key="toast.id">
+            <div class="pointer-events-auto flex items-center p-4 rounded-xl shadow-xl border text-xs max-w-sm transition-all bg-slate-900 text-white border-slate-800" :class="toast.type === 'error' ? 'border-rose-500/50 bg-rose-950 text-rose-200' : ''">
+                <span x-text="toast.message" class="font-semibold"></span>
             </div>
-        </div>
+        </template>
+    </div>
 
-        <div x-show="mobileMenuOpen" x-transition class="md:hidden bg-white border-b border-gray-200" x-cloak>
-            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                <button @click="currentTab = 'home'; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50">Home</button>
-                <button @click="currentTab = 'browse'; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50">Browse Ebooks</button>
-                <button x-show="isLoggedIn" @click="currentTab = 'dashboard'; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50" x-cloak>Dashboard</button>
-                
-                <hr class="my-2 border-gray-200">
-                
-                <template x-if="!isLoggedIn">
-                    <div class="space-y-1">
-                        <button @click="authMode = 'login'; authModalOpen = true; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50">Log in</button>
-                        <button @click="authMode = 'register'; authModalOpen = true; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-indigo-600 hover:bg-indigo-50">Sign up</button>
-                    </div>
-                </template>
-                <template x-if="isLoggedIn">
-                    <div class="px-3 py-2 space-y-2">
-                        <div class="text-xs text-gray-500" x-text="`Logged in as: ${userRole}`"></div>
-                        <button @click="isLoggedIn = false; userRole = 'Guest'; mobileMenuOpen = false; currentTab = 'home'" class="flex items-center text-base font-medium text-red-600">
-                            <i data-lucide="log-out" class="w-5 h-5 mr-2"></i> Logout
-                        </button>
-                    </div>
-                </template>
-            </div>
-        </div>
-    </nav>
-
-    <main class="min-h-[calc(100vh-16rem)]">
+    <div class="min-h-screen flex flex-col justify-between">
         
-        <div x-show="currentTab === 'home'" x-transition:enter="transition ease-out duration-500" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+        <nav class="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur-md dark:bg-slate-900 dark:border-slate-800">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex h-16 justify-between items-center">
+                    <div class="flex items-center gap-6">
+                        <a href="#" @click.prevent="navigateTo('home')" class="flex items-center gap-2 font-black text-xl text-indigo-600 dark:text-indigo-400 tracking-tight">
+                            <span>📚 Fable</span>
+                        </a>
+                        <div class="hidden md:flex items-center space-x-2 text-sm font-medium">
+                            <button @click="navigateTo('home')" :class="currentRoute === 'home' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-3 py-2 rounded-lg' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'" class="transition-all">Home</button>
+                            <button @click="navigateTo('browse')" :class="currentRoute === 'browse' ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-3 py-2 rounded-lg' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'" class="transition-all">Browse Ebooks</button>
+                            <template x-if="userSession">
+                                <button @click="navigateTo('dashboard')" :class="currentRoute.startsWith('dashboard') ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-3 py-2 rounded-lg' : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'" class="transition-all">Dashboard</button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div class="hidden md:flex items-center gap-4">
+                        <button @click="toggleDarkMode()" class="p-2 text-slate-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                            <span x-show="!darkMode">🌙</span><span x-show="darkMode" x-cloak>☀️</span>
+                        </button>
+                        <template x-if="!userSession">
+                            <div class="flex items-center gap-2">
+                                <button @click="navigateTo('login')" class="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 px-3 py-2">Login</button>
+                                <button @click="navigateTo('register')" class="bg-indigo-600 text-white text-sm px-4 py-2 rounded-xl font-medium hover:bg-indigo-500 transition-all">Get Started</button>
+                            </div>
+                        </template>
+                        <template x-if="userSession">
+                            <div class="flex items-center gap-3">
+                                <div class="text-right">
+                                    <p class="text-xs font-bold text-slate-900 dark:text-white" x-text="userSession.name"></p>
+                                    <p class="text-[10px] tracking-wider uppercase font-extrabold text-indigo-600 dark:text-indigo-400" x-text="userSession.role"></p>
+                                </div>
+                                <img :src="userSession.avatar" class="w-8 h-8 rounded-full ring-2 ring-slate-200 object-cover">
+                                <button @click="logout()" class="text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 px-3 py-2 rounded-lg">Logout</button>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="md:hidden flex items-center gap-2">
+                        <button @click="toggleDarkMode()" class="p-2 text-sm">
+                            <span x-show="!darkMode">🌙</span><span x-show="darkMode">☀️</span>
+                        </button>
+                        <button @click="mobileMenuOpen = !mobileMenuOpen" class="text-slate-600 dark:text-slate-300 p-2 text-xl">☰</button>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="mobileMenuOpen" x-cloak class="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 space-y-2">
+                <button @click="navigateTo('home'); mobileMenuOpen = false" class="block w-full text-left py-2 text-sm">Home</button>
+                <button @click="navigateTo('browse'); mobileMenuOpen = false" class="block w-full text-left py-2 text-sm">Browse Ebooks</button>
+                <template x-if="userSession">
+                    <button @click="navigateTo('dashboard'); mobileMenuOpen = false" class="block w-full text-left py-2 text-sm">Dashboard</button>
+                </template>
+                <div class="pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <template x-if="!userSession">
+                        <div class="space-y-2">
+                            <button @click="navigateTo('login'); mobileMenuOpen = false" class="block w-full text-center py-2 border rounded-xl text-sm">Login</button>
+                            <button @click="navigateTo('register'); mobileMenuOpen = false" class="block w-full text-center py-2 bg-indigo-600 text-white rounded-xl text-sm">Register</button>
+                        </div>
+                    </template>
+                    <template x-if="userSession">
+                        <button @click="logout(); mobileMenuOpen = false" class="block w-full text-center py-2 bg-rose-600 text-white rounded-xl text-sm">Logout</button>
+                    </template>
+                </div>
+            </div>
+        </nav>
+
+        <div x-show="globalLoading" class="flex-1 flex flex-col items-center justify-center bg-white dark:bg-slate-950 py-24">
+            <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+            <p class="text-xs font-semibold text-slate-400 mt-4 tracking-widest uppercase">Processing Request Pipeline...</p>
+        </div>
+
+        <main class="flex-1" x-show="!globalLoading">
             
-            <div class="relative bg-gray-900 h-[450px] md:h-[550px] overflow-hidden" x-data="{ 
-                activeSlide: 1,
-                slides: [
-                    { id: 1, tag: 'Discover & Read Original Ebooks', title: 'Your Digital Gateway to Endless Stories', desc: 'Connect with thousands of global writers sharing rare and authentic web creations.', bg: 'from-purple-900 to-indigo-900' },
-                    { id: 2, tag: 'Empower Independent Creators', title: 'Write, Publish, & Earn Direct Royalties', desc: 'Seamlessly shift your reader account to a writer profile to start monetization steps instantly.', bg: 'from-indigo-900 to-blue-900' }
-                ]
-            }" x-init="setInterval(() => { activeSlide = activeSlide === 1 ? 2 : 1 }, 6000)">
+            <div x-show="currentRoute === 'home'" class="w-full animate-fade-in">
+                <section class="relative bg-slate-900 text-white h-[450px] flex items-center overflow-hidden" x-data="{ currentSlide: 1 }">
+                    <div class="absolute inset-0 bg-cover bg-center opacity-30" :style="currentSlide === 1 ? 'background-image: url(\'https://images.unsplash.com/photo-1516979187457-637abb4f9353?q=80&w=1200\')' : 'background-image: url(\'https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=1200\')'"></div>
+                    <div class="absolute inset-0 bg-gradient-to-r from-slate-950 to-transparent"></div>
+                    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10 w-full">
+                        <div class="max-w-2xl space-y-4">
+                            <span class="bg-indigo-600 text-white text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full">Fable Publishing Grid</span>
+                            <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight">Discover & Read Original Ebooks</h1>
+                            <p class="text-slate-300 text-sm sm:text-base leading-relaxed">Connect directly with authors, execute low-latency Stripe acquisitions, and manage library history nodes instantly via high-fidelity control matrices.</p>
+                            <div class="pt-4">
+                                <button @click="navigateTo('browse')" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold px-6 py-3 rounded-xl shadow-lg shadow-indigo-600/30 transition-all transform hover:-translate-y-0.5">Browse Ebooks</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="absolute bottom-6 right-6 flex gap-2 z-20">
+                        <button @click="currentSlide = 1" class="w-8 h-1.5 rounded-full" :class="currentSlide === 1 ? 'bg-indigo-500' : 'bg-slate-700'"></button>
+                        <button @click="currentSlide = 2" class="w-8 h-1.5 rounded-full" :class="currentSlide === 2 ? 'bg-indigo-500' : 'bg-slate-700'"></button>
+                    </div>
+                </section>
+
+                <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                    <div class="flex flex-col sm:flex-row justify-between sm:items-end mb-8 gap-2">
+                        <div>
+                            <h2 class="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Featured Ebooks Catalog</h2>
+                            <p class="text-xs text-slate-400 mt-1">Live data aggregates synchronized across distributed store repositories.</p>
+                        </div>
+                        <button @click="navigateTo('browse')" class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">View All Documents &rarr;</button>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
+                        <template x-for="book in ebooks.slice(0,6)" :key="book._id">
+                            <div @click="viewEbookDetails(book._id)" class="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 shadow-xs hover:shadow-md transition-all cursor-pointer transform hover:-translate-y-1">
+                                <div class="relative aspect-[3/4] rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 mb-3">
+                                    <img :src="book.coverImage" class="w-full h-full object-cover">
+                                    <template x-if="book.availability === 'sold'">
+                                        <div class="absolute top-2 right-2 bg-rose-600 text-white font-black text-[9px] uppercase px-1.5 py-0.5 rounded tracking-wider shadow-xs">Sold</div>
+                                    </template>
+                                </div>
+                                <span class="text-[9px] font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400" x-text="book.genre"></span>
+                                <h3 class="font-bold text-xs text-slate-900 dark:text-white truncate mt-0.5" x-text="book.title"></h3>
+                                <p class="text-[11px] text-slate-400 truncate mt-0.5" x-text="'By ' + getWriterName(book.writer)"></p>
+                                <div class="mt-2 flex items-center justify-between text-xs pt-1.5 border-t border-slate-100 dark:border-slate-800">
+                                    <span class="font-bold text-slate-900 dark:text-white" x-text="'$' + book.price"></span>
+                                    <span class="text-[10px] text-indigo-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity">Inspect</span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+
+                <section class="bg-slate-100 dark:bg-slate-900/40 border-y border-slate-200 dark:border-slate-800/80 py-16">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                        <h2 class="text-2xl font-black text-slate-900 dark:text-white">Top Performing Platform Authors</h2>
+                        <p class="text-xs text-slate-400 mt-1 max-w-md mx-auto mb-10">Writers driving record-breaking sales volume channels through transparent digital content publishing chains.</p>
+                        
+                        <div class="grid sm:grid-cols-3 gap-8 max-w-4xl mx-auto">
+                            <template x-for="writer in platformWriters.slice(0,3)" :key="writer._id">
+                                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-xs flex flex-col items-center">
+                                    <img :src="writer.avatar" class="w-16 h-16 rounded-full object-cover ring-4 ring-indigo-500/20 mb-4">
+                                    <h4 class="font-bold text-sm text-slate-900 dark:text-white" x-text="writer.name"></h4>
+                                    <p class="text-xs text-slate-400 mt-0.5" x-text="writer.email"></p>
+                                    <div class="mt-4 px-3 py-1 bg-emerald-50 dark:bg-emerald-950/40 rounded-full text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider">Verified Merchant</div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+                    <h2 class="text-2xl font-black text-slate-900 dark:text-white mb-2">Explore Literature Categories</h2>
+                    <p class="text-xs text-slate-400 mb-8">Click any structural classification token below to isolate catalog views inside search dashboards.</p>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                        <template x-for="g in genres" :key="g">
+                            <div @click="browseGenreFilter = g; navigateTo('browse')" class="cursor-pointer p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-indigo-500 rounded-xl text-center shadow-2xs group transition-all">
+                                <p class="font-bold text-sm text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400" x-text="g"></p>
+                                <p class="text-[10px] text-slate-400 mt-1">Isolate Items &rarr;</p>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+            </div>
+
+            <div x-show="currentRoute === 'browse'" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-fade-in" x-cloak>
+                <div class="flex flex-col lg:flex-row gap-8">
+                    <div class="w-full lg:w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl h-fit space-y-6 shrink-0">
+                        <div class="flex justify-between items-center pb-4 border-b">
+                            <h3 class="font-black text-sm uppercase tracking-wider">Search Matrices</h3>
+                            <button @click="resetFilters()" class="text-xs text-indigo-500 hover:underline font-semibold">Reset All</button>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Query Input</label>
+                            <input type="text" x-model="browseSearchQuery" placeholder="Title or writer profile..." class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2 text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Genre Specification</label>
+                            <select x-model="browseGenreFilter" class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2 text-xs">
+                                <option value="">All Categories</option>
+                                <template x-for="g in genres" :key="g">
+                                    <option :value="g" x-text="g"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5" x-text="'Max Asset Cost: $' + browsePriceRange"></label>
+                            <input type="range" min="5" max="50" x-model="browsePriceRange" class="w-full accent-indigo-600">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Availability Allocation</label>
+                            <div class="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
+                                <label class="flex items-center gap-2"><input type="radio" value="" x-model="browseStockFilter"> <span>All Items</span></label>
+                                <label class="flex items-center gap-2"><input type="radio" value="available" x-model="browseStockFilter"> <span>In Stock / Available</span></label>
+                                <label class="flex items-center gap-2"><input type="radio" value="sold" x-model="browseStockFilter"> <span>Sold / Out of Stock</span></label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Sorting Framework</label>
+                            <select x-model="browseSortOrder" class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2 text-xs">
+                                <option value="newest">Newest Uploads</option>
+                                <option value="low-high">Price: Low to High</option>
+                                <option value="high-low">Price: High to Low</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 space-y-6">
+                        <div class="text-xs text-slate-400 font-medium" x-text="getFilteredEbooks().length + ' data documents verified inside view matrix.'"></div>
+                        
+                        <div x-show="getFilteredEbooks().length === 0" class="p-12 text-center bg-white dark:bg-slate-900 border border-dashed rounded-2xl">
+                            <p class="text-sm text-slate-400 italic">Friendly notice: No premium ebooks correspond to your active runtime filter conditions.</p>
+                            <button @click="resetFilters()" class="mt-4 text-xs font-bold text-indigo-500 underline">Purge Filter Rules</button>
+                        </div>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+                            <template x-for="book in getPaginatedEbooks()" :key="book._id">
+                                <div @click="viewEbookDetails(book._id)" class="bg-white dark:bg-slate-900 border rounded-xl p-3 hover:shadow-lg transition-all cursor-pointer flex flex-col justify-between">
+                                    <div class="space-y-2">
+                                        <div class="relative aspect-[3/4] rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                            <img :src="book.coverImage" class="w-full h-full object-cover">
+                                            <template x-if="book.availability === 'sold'">
+                                                <div class="absolute top-2 right-2 bg-rose-600 text-white font-black text-[9px] px-2 py-0.5 rounded uppercase tracking-wider">Sold</div>
+                                            </template>
+                                        </div>
+                                        <div>
+                                            <span class="text-[9px] font-extrabold uppercase tracking-wider text-indigo-500" x-text="book.genre"></span>
+                                            <h4 class="font-bold text-xs text-slate-900 dark:text-white truncate mt-0.5" x-text="book.title"></h4>
+                                            <p class="text-[11px] text-slate-400 truncate" x-text="'By ' + getWriterName(book.writer)"></p>
+                                        </div>
+                                    </div>
+                                    <div class="mt-4 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs font-bold">
+                                        <span class="text-slate-900 dark:text-white" x-text="'$' + book.price"></span>
+                                        <span class="text-indigo-500 text-[10px]">Inspect Asset &rarr;</span>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="flex justify-center items-center gap-2 pt-4" x-show="getTotalPages() > 1">
+                            <button @click="browseCurrentPage = Math.max(1, browseCurrentPage - 1)" :disabled="browseCurrentPage === 1" class="px-3 py-1.5 border rounded-lg bg-white dark:bg-slate-900 text-xs disabled:opacity-40 font-semibold">Previous</button>
+                            <span class="text-xs text-slate-400 font-medium px-2" x-text="'Page ' + browseCurrentPage + ' of ' + getTotalPages()"></span>
+                            <button @click="browseCurrentPage = Math.min(getTotalPages(), browseCurrentPage + 1)" :disabled="browseCurrentPage === getTotalPages()" class="px-3 py-1.5 border rounded-lg bg-white dark:bg-slate-900 text-xs disabled:opacity-40 font-semibold">Next</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="currentRoute === 'ebook-details' && selectedEbook" class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 animate-fade-in" x-cloak>
+                <button @click="navigateTo('browse')" class="text-xs font-bold text-slate-400 hover:text-slate-900 dark:hover:text-white mb-6 block">&larr; Back to Catalog Grid</button>
                 
-                <template x-for="slide in slides" :key="slide.id">
-                    <div x-show="activeSlide === slide.id" 
-                         x-transition:enter="transition ease-in-out duration-700 transform"
-                         x-transition:enter-start="opacity-0 translate-x-full"
-                         x-transition:enter-end="opacity-100 translate-x-0"
-                         x-transition:leave="transition ease-in-out duration-700 transform"
-                         x-transition:leave-start="opacity-100 translate-x-0"
+                <div class="bg-white dark:bg-slate-900 border rounded-3xl p-6 sm:p-8 flex flex-col md:flex-row gap-8 shadow-xs">
+                    <div class="w-full md:w-64 shrink-0 space-y-4">
+                        <div class="aspect-[3/4] rounded-xl bg-slate-100 dark:bg-slate-800 overflow-hidden shadow-inner border">
+                            <img :src="selectedEbook?.coverImage" class="w-full h-full object-cover">
+                        </div>
+                        <div class="bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl text-xs space-y-2 font-medium">
+                            <div class="flex justify-between"><span class="text-slate-400">Status Vector:</span><span class="font-bold uppercase tracking-wider text-emerald-500" x-text="selectedEbook?.availability"></span></div>
+                            <div class="flex justify-between"><span class="text-slate-400">Genre Node:</span><span class="text-slate-700 dark:text-slate-300" x-text="selectedEbook?.genre"></span></div>
+                            <div class="flex justify-between"><span class="text-slate-400">Timestamp:</span><span class="text-slate-500" x-text="selectedEbook?.dateUploaded"></span></div>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 flex flex-col justify-between space-y-6">
+                        <div class="space-y-4">
+                            <div>
+                                <span class="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-md tracking-wider" x-text="selectedEbook?.genre"></span>
+                                <h1 class="text-2xl sm:text-4xl font-black tracking-tight text-slate-900 dark:text-white mt-2" x-text="selectedEbook?.title"></h1>
+                                <p class="text-xs text-slate-400 mt-1">Authored Node ID Reference: <span class="text-indigo-500 font-bold hover:underline cursor-pointer" x-text="getWriterName(selectedEbook?.writer)"></span></p>
+                            </div>
+
+                            <div class="border-t border-b py-4 space-y-1.5">
+                                <h5 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Document Core Content Blueprint Abstract</h5>
+                                <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed italic" x-text="selectedEbook?.description"></p>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <div>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase block">Licensing Fee Evaluation</span>
+                                <span class="text-2xl font-black text-slate-900 dark:text-white" x-text="'$' + selectedEbook?.price"></span>
+                            </div>
+                            
+                            <div class="flex items-center gap-2 w-full sm:w-auto">
+                                <button @click="toggleWishlist(selectedEbook?._id)" class="p-3 border rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-bold transition-all">
+                                    <span x-show="wishlist.includes(selectedEbook?._id)">❤️ Saved</span>
+                                    <span x-show="!wishlist.includes(selectedEbook?._id)">🤍 Save</span>
+                                </button>
+                                
+                                <template x-if="selectedEbook?.availability === 'sold'">
+                                    <button disabled class="flex-1 sm:flex-none px-6 py-3 bg-slate-300 dark:bg-slate-700 text-slate-500 text-xs font-bold rounded-xl cursor-not-allowed">Product Asset Sold Out</button>
+                                </template>
+                                <template x-if="selectedEbook?.availability !== 'sold'">
+                                    <div class="flex-1 sm:flex-none">
+                                        <template x-if="userSession && userSession._id === selectedEbook?.writer">
+                                            <button disabled class="w-full px-6 py-3 bg-amber-100 text-amber-800 text-xs font-bold rounded-xl cursor-not-allowed">Your Product Spec Document</button>
+                                        </template>
+                                        <template x-if="userSession && userSession._id !== selectedEbook?.writer && userPurchasedBookIds.includes(selectedEbook?._id)">
+                                            <button disabled class="w-full px-6 py-3 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl cursor-not-allowed">Already Purchased (Access Active)</button>
+                                        </template>
+                                        <template x-if="!userPurchasedBookIds.includes(selectedEbook?._id) && (!userSession || userSession._id !== selectedEbook?.writer)">
+                                            <button @click="executeStripeSimulation(selectedEbook)" class="w-full px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-md">Buy Now (Stripe Checkout)</button>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="currentRoute === 'login'" class="max-w-md mx-auto px-4 py-20 animate-fade-in" x-cloak>
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-3xl shadow-xs space-y-6">
+                    <div class="text-center">
+                        <h2 class="text-xl font-black text-slate-900 dark:text-white">Authenticate Credentials</h2>
+                        <p class="text-xs text-slate-400 mt-1">Provide secure identity tokens to parse dashboard objects.</p>
+                    </div>
+                    
+                    <form @submit.prevent="submitLogin()" class="space-y-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Email Node Address</label>
+                            <input type="email" x-model="loginEmail" required class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2.5 text-xs font-medium">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Password Core String</label>
+                            <input type="password" x-model="loginPassword" required class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2.5 text-xs font-medium">
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white font-bold text-xs py-3 rounded-xl hover:bg-indigo-500 transition-all">Validate JWT Handshake Token</button>
+                    </form>
+
+                    <div class="relative flex py-2 items-center text-[10px] text-slate-400 font-extrabold uppercase">
+                        <div class="flex-grow border-t"></div><span class="mx-3">Or Auth Node Provider</span><div class="flex-grow border-t"></div>
+                    </div>
+
+                    <button @click="triggerBetterAuthOAuth()" class="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 p-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all text-slate-700 dark:text-slate-300">
+                        🔄 BetterAuth Google Federated OAuth Flow
+                    </button>
+                    
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-[11px] text-slate-500 space-y-1">
+                        <p class="font-bold uppercase tracking-wider text-slate-400">Sandbox Fast-Track Credentials:</p>
+                        <p>• Admin Node: <span class="font-mono text-indigo-500 font-bold">admin@fable.com</span> / <span class="font-mono">Admin@123</span></p>
+                        <p>• Writer Node: <span class="font-mono text-indigo-500 font-bold">writer@fable.com</span> / <span class="font-mono">writer123</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="currentRoute === 'register'" class="max-w-md mx-auto px-4 py-16 animate-fade-in" x-cloak>
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-3xl shadow-xs space-y-5">
+                    <div class="text-center">
+                        <h2 class="text-xl font-black text-slate-900 dark:text-white">Scaffold Account Cluster</h2>
+                        <p class="text-xs text-slate-400 mt-1">Commit encrypted access parameters onto relational ledger tables.</p>
+                    </div>
+
+                    <form @submit.prevent="submitRegister()" class="space-y-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Full Identity Name</label>
+                            <input type="text" x-model="regName" required class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2.5 text-xs font-medium">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Email Root Target</label>
+                            <input type="email" x-model="regEmail" required class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2.5 text-xs font-medium">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Password Core Input</label>
+                            <input type="password" x-model="regPassword" required class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2.5 text-xs font-medium">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Confirm Signature Verification</label>
+                            <input type="password" x-model="regConfirm" required class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2.5 text-xs font-medium">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Primary Permissions Privilege Mapping Mode</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="border p-3 rounded-xl flex items-center justify-between cursor-pointer text-xs font-bold uppercase tracking-wider" :class="regRole === 'user' ? 'border-indigo-600 bg-indigo-50/20 text-indigo-600' : ''">
+                                    <span>Reader (User)</span>
+                                    <input type="radio" value="user" x-model="regRole" class="sr-only">
+                                </label>
+                                <label class="border p-3 rounded-xl flex items-center justify-between cursor-pointer text-xs font-bold uppercase tracking-wider" :class="regRole === 'writer' ? 'border-indigo-600 bg-indigo-50/20 text-indigo-600' : ''">
+                                    <span>Writer</span>
+                                    <input type="radio" value="writer" x-model="regRole" class="sr-only">
+                                </label>
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-indigo-600 text-white font-bold text-xs py-3 rounded-xl hover:bg-indigo-500 transition-all shadow-xs">Register Secure Account & Issue JWT</button>
+                    </form>
+                </div>
+            </div>
+
+            <div x-show="currentRoute === 'dashboard' && userSession" class="w-full animate-fade-in" x-cloak>
+                <div class="bg-slate-900 text-white border-b border-slate-800">
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div class="flex items-center gap-3">
+                            <img :src="userSession?.avatar" class="w-12 h-12 rounded-full object-cover border-2 border-indigo-500 shadow-sm">
+                            <div>
+                                <h2 class="text-base font-black tracking-tight" x-text="userSession?.name"></h2>
+                                <p class="text-xs text-slate-400" x-text="userSession?.email"></p>
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-1 bg-slate-800 p-1 rounded-xl text-xs font-bold">
+                            <button @click="dashboardTab = 'home'" :class="dashboardTab === 'home' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'" class="px-3 py-2 rounded-lg transition-all">Overview & Metrics</button>
+                            
+                            <template x-if="userSession?.role === 'user'">
+                                <div class="flex gap-1">
+                                    <button @click="dashboardTab = 'user-library'" :class="dashboardTab === 'user-library' ? 'bg-indigo-600 text-white' : 'text-slate-400'" class="px-3 py-2 rounded-lg">My Library</button>
+                                    <button @click="dashboardTab = 'wishlist'" :class="dashboardTab === 'wishlist' ? 'bg-indigo-600 text-white' : 'text-slate-400'" class="px-3 py-2 rounded-lg">Wishlist Ledger</button>
+                                </div>
+                            </template>
+
+                            <template x-if="userSession?.role === 'writer'">
+                                <div class="flex gap-1">
+                                    <button @click="dashboardTab = 'writer-products'" :class="dashboardTab === 'writer-products' ? 'bg-indigo-600 text-white' : 'text-slate-400'" class="px-3 py-2 rounded-lg">Manage Ebooks</button>
+                                    <button @click="dashboardTab = 'writer-sales'" :class="dashboardTab === 'writer-sales' ? 'bg-indigo-600 text-white' : 'text-slate-400'" class="px-3 py-2 rounded-lg">Sales Streams</button>
+                                </div>
+                            </template>
+
+                            <template x-if="userSession?.role === 'admin'">
+                                <div class="flex gap-1">
+                                    <button @click="dashboardTab = 'admin-users'" :class="dashboardTab === 'admin-users' ? 'bg-indigo-600 text-white' : 'text-slate-400'" class="px-3 py-2 rounded-lg">Users Panel</button>
+                                    <button @click="dashboardTab = 'admin-ebooks'" :class="dashboardTab === 'admin-ebooks' ? 'bg-indigo-600 text-white' : 'text-slate-400'" class="px-3 py-2 rounded-lg">Global Ledger</button>
+                                    <button @click="dashboardTab = 'admin-tx'" :class="dashboardTab === 'admin-tx' ? 'bg-indigo-600 text-white' : 'text-slate-400'" class="px-3 py-2 rounded-lg">Transactions</button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
+                    
+                    <div x-show="dashboardTab === 'home'" class="space-y-8 animate-fade-in">
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div class="bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-2xs"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Accounts Registry Count</span><span class="text-3xl font-black text-slate-900 dark:text-white block mt-1" x-text="platformUsers.length"></span></div>
+                            <div class="bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-2xs"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Active Book Records</span><span class="text-3xl font-black text-slate-900 dark:text-white block mt-1" x-text="ebooks.length"></span></div>
+                            <div class="bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-2xs"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Acquisitions Processed</span><span class="text-3xl font-black text-slate-900 dark:text-white block mt-1" x-text="transactions.filter(t=>t.type==='purchase').length"></span></div>
+                            <div class="bg-white dark:bg-slate-900 border p-5 rounded-2xl shadow-2xs"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Gross Platform Revenue</span><span class="text-3xl font-black text-emerald-600 dark:text-emerald-400 block mt-1" x-text="'$' + getGrossRevenue()"></span></div>
+                        </div>
+
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="bg-white dark:bg-slate-900 border p-6 rounded-2xl"><h4 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-wider">Ebooks distribution by Genre Allocation</h4><div class="max-w-[240px] mx-auto"><canvas id="genrePieChart"></canvas></div></div>
+                            <div class="bg-white dark:bg-slate-900 border p-6 rounded-2xl"><h4 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-wider">Revenue Stream Progression Chart</h4><canvas id="salesLineChart"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div x-show="dashboardTab === 'user-library'" class="space-y-6 animate-fade-in" x-cloak>
+                        <h3 class="text-lg font-black tracking-tight">Verified Premium Library Documents</h3>
+                        <div x-show="getUserPurchasedEbooks().length === 0" class="p-8 text-center border border-dashed rounded-xl text-xs text-slate-400 italic">No access licenses matching your user session profile found.</div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                            <template x-for="book in getUserPurchasedEbooks()" :key="book._id">
+                                <div @click="viewEbookDetails(book._id)" class="bg-white dark:bg-slate-900 border p-3 rounded-xl cursor-pointer hover:shadow-md transition-all">
+                                    <img :src="book.coverImage" class="aspect-[3/4] object-cover rounded-lg w-full mb-2">
+                                    <h4 class="font-bold text-xs truncate text-slate-900 dark:text-white" x-text="book.title"></h4>
+                                    <span class="text-[9px] bg-emerald-50 text-emerald-700 font-extrabold px-2 py-0.5 rounded tracking-wider uppercase mt-1 inline-block">Full Access Crypt Node Active</span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div x-show="dashboardTab === 'wishlist'" class="space-y-6 animate-fade-in" x-cloak>
+                        <h3 class="text-lg font-black tracking-tight">Saved Ebooks Wishlist</h3>
+                        <div x-show="wishlist.length === 0" class="p-8 text-center border border-dashed rounded-xl text-xs text-slate-400 italic">Your wishlist array node is empty. Explore browse catalog structures to append data.</div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                            <template x-for="id in wishlist" :key="id">
+                                <div class="bg-white dark:bg-slate-900 border p-3 rounded-xl flex flex-col justify-between">
+                                    <div @click="viewEbookDetails(id)" class="cursor-pointer space-y-2">
+                                        <img :src="getEbookObject(id)?.coverImage" class="aspect-[3/4] object-cover rounded-lg w-full">
+                                        <h4 class="font-bold text-xs truncate text-slate-900 dark:text-white" x-text="getEbookObject(id)?.title"></h4>
+                                    </div>
+                                    <button @click="executeStripeSimulation(getEbookObject(id))" class="mt-3 w-full bg-indigo-600 text-white font-bold text-[10px] py-2 rounded-lg">Buy Now</button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div x-show="dashboardTab === 'writer-products'" class="space-y-6 animate-fade-in" x-cloak>
+                        <div class="flex justify-between items-center"><h3 class="text-lg font-black tracking-tight">Authored Creative Catalog Ledger</h3><button @click="launchAssetWizard()" class="bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl hover:bg-indigo-500">+ Issue New Ebook Entry</button></div>
+                        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead class="bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                                    <tr><th class="p-3">Cover Image</th><th class="p-3">Title Metadata</th><th class="p-3">Niche Category</th><th class="p-3">Licensing Fee</th><th class="p-3">Status</th><th class="p-3 text-right">Actions</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
+                                    <template x-for="book in getWriterOwnedEbooks()" :key="book._id">
+                                        <tr>
+                                            <td class="p-3"><img :src="book.coverImage" class="w-10 h-14 object-cover rounded bg-slate-50"></td>
+                                            <td class="p-3 font-bold text-slate-900 dark:text-white" x-text="book.title"></td>
+                                            <td class="p-3 text-slate-500" x-text="book.genre"></td>
+                                            <td class="p-3 font-semibold text-slate-700 dark:text-slate-300" x-text="'$' + book.price"></td>
+                                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[9px] uppercase font-bold" :class="book.availability==='available'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'" x-text="book.availability"></span></td>
+                                            <td class="p-3 text-right space-x-2 font-bold"><button @click="launchAssetWizard(book)" class="text-indigo-500 hover:underline">Edit</button><button @click="purgeEbookDataRecord(book._id)" class="text-rose-500 hover:underline">Delete</button></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div x-show="dashboardTab === 'writer-sales'" class="space-y-6 animate-fade-in" x-cloak>
+                        <h3 class="text-lg font-black tracking-tight">Cleared Ledger Direct Royalty Sales Streams</h3>
+                        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead class="bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold text-[10px] uppercase">
+                                    <tr><th class="p-3">Tx Identifier Hash</th><th class="p-3">Purchased Ebook Title</th><th class="p-3">Procurement Allocation Timestamp</th><th class="p-3 text-right">Settled Amount</th></tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-600 dark:text-slate-300">
+                                    <template x-for="tx in getWriterSalesTransactions()" :key="tx.transactionId">
+                                        <tr>
+                                            <td class="p-3 font-mono text-[11px] text-slate-400" x-text="tx.transactionId"></td>
+                                            <td class="p-3 font-bold text-slate-900 dark:text-white" x-text="getEbookObject(tx.ebook)?.title"></td>
+                                            <td class="p-3" x-text="tx.createdAt"></td>
+                                            <td class="p-3 text-right font-black text-emerald-600" x-text="'$' + tx.amount"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div x-show="dashboardTab === 'admin-users'" class="space-y-6 animate-fade-in" x-cloak>
+                        <h3 class="text-lg font-black tracking-tight">Ecosystem Global Permissions Matrix</h3>
+                        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:bg-slate-900">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead class="bg-slate-100 text-slate-500 font-bold uppercase text-[10px]">
+                                    <tr><th class="p-3">User Profile</th><th class="p-3">Email Root Target</th><th class="p-3">Active Authority Permission Node</th><th class="p-3 text-right">System Configuration Actions</th></tr>
+                                </thead>
+                                <tbody class="divide-y text-slate-700 dark:text-slate-200 font-medium">
+                                    <template x-for="user in platformUsers" :key="user._id">
+                                        <tr>
+                                            <td class="p-3 flex items-center gap-2 font-bold text-slate-900 dark:text-white"><img :src="user.avatar" class="w-6 h-6 rounded-full object-cover"><span x-text="user.name"></span></td>
+                                            <td class="p-3 font-mono text-slate-500" x-text="user.email"></td>
+                                            <td class="p-3"><span class="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono font-bold text-[10px] px-2 py-0.5 rounded uppercase" x-text="user.role"></span></td>
+                                            <td class="p-3 text-right space-x-1 font-bold">
+                                                <button @click="reassignUserPermissionRole(user._id, 'user')" class="px-2 py-1 border rounded text-[10px] bg-slate-50 hover:bg-slate-100">Reader</button>
+                                                <button @click="reassignUserPermissionRole(user._id, 'writer')" class="px-2 py-1 border rounded text-[10px] bg-slate-50 hover:bg-slate-100">Writer</button>
+                                                <button @click="reassignUserPermissionRole(user._id, 'admin')" class="px-2 py-1 border rounded text-[10px] bg-slate-50 hover:bg-slate-100">Admin</button>
+                                                <button @click="purgePlatformUserNode(user._id)" class="px-2 py-1 bg-rose-50 text-rose-600 rounded text-[10px]">Delete</button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div x-show="dashboardTab === 'admin-ebooks'" class="space-y-6 animate-fade-in" x-cloak>
+                        <h3 class="text-lg font-black tracking-tight">System Global Content Inventory Manifest</h3>
+                        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:bg-slate-900">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead class="bg-slate-100 text-slate-500 font-bold uppercase text-[10px]">
+                                    <tr><th class="p-3">Cover Image</th><th class="p-3">Title</th><th class="p-3">Author Node</th><th class="p-3">Cost Basis</th><th class="p-3">Allocation</th><th class="p-3 text-right">Interventions</th></tr>
+                                </thead>
+                                <tbody class="divide-y font-medium text-slate-600 dark:text-slate-300">
+                                    <template x-for="book in ebooks" :key="book._id">
+                                        <tr>
+                                            <td class="p-3"><img :src="book.coverImage" class="w-8 h-12 object-cover rounded"></td>
+                                            <td class="p-3 font-bold text-slate-900 dark:text-white" x-text="book.title"></td>
+                                            <td class="p-3 text-indigo-500" x-text="getWriterName(book.writer)"></td>
+                                            <td class="p-3 font-semibold" x-text="'$' + book.price"></td>
+                                            <td class="p-3"><span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase" :class="book.availability==='available'?'bg-emerald-50 text-emerald-700':'bg-rose-50 text-rose-700'" x-text="book.availability"></span></td>
+                                            <td class="p-3 text-right"><button @click="purgeEbookDataRecord(book._id)" class="text-rose-500 font-bold hover:underline">Force Intercept & Purge</button></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div x-show="dashboardTab === 'admin-tx'" class="space-y-6 animate-fade-in" x-cloak>
+                        <h3 class="text-lg font-black tracking-tight">Global Operational Transaction Audit Inflow Logs</h3>
+                        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:bg-slate-900">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead class="bg-slate-100 text-slate-500 font-bold uppercase text-[10px]">
+                                    <tr><th class="p-3">Tx Unique Token ID String</th><th class="p-3">Inflow Nature Classification</th><th class="p-3">Target Ebook Context</th><th class="p-3">Trigger Email Client</th><th class="p-3 font-black text-right">Settled Value Allocation</th></tr>
+                                </thead>
+                                <tbody class="divide-y font-mono text-[11px] text-slate-500">
+                                    <template x-for="tx in transactions" :key="tx.transactionId">
+                                        <tr>
+                                            <td class="p-3 text-slate-400" x-text="tx.transactionId"></td>
+                                            <td class="p-3 font-bold uppercase text-[10px]" :class="tx.type==='purchase'?'text-blue-500':'text-amber-500'" x-text="tx.type"></td>
+                                            <td class="p-3 font-sans font-bold text-slate-800 dark:text-slate-200" x-text="tx.ebook ? getEbookObject(tx.ebook)?.title : 'System Writer Onboarding Verification Access Fee'"></td>
+                                            <td class="p-3 font-sans" x-text="getUserObject(tx.buyer)?.email"></td>
+                                            <td class="p-3 text-right font-sans font-black text-slate-900 dark:text-white" x-text="'$' + tx.amount"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="wizardOpen" class="fixed inset-0 bg-slate-950/50 backdrop-blur-xs flex items-center justify-center z-50 p-4" x-cloak>
+                <div class="bg-white dark:bg-slate-900 border rounded-3xl p-6 max-w-md w-full space-y-4">
+                    <h3 class="text-base font-black tracking-tight text-slate-900 dark:text-white" x-text="wizardEditMode ? 'Modify Digital Product Record Parameters' : 'Launch New Independent Content Specification Asset'"></h3>
+                    <div class="space-y-3 text-xs">
+                        <div><label class="block font-bold text-slate-400 uppercase mb-1">Asset Document Title</label><input type="text" x-model="wizardTitle" class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2.5"></div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div><label class="block font-bold text-slate-400 uppercase mb-1">Genre Target Selection</label><select x-model="wizardGenre" class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2.5"><template x-for="g in genres" :key="g"><option :value="g" x-text="g"></option></template></select></div>
+                            <div><label class="block font-bold text-slate-400 uppercase mb-1">Licensing Price ($)</label><input type="number" x-model="wizardPrice" class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2.5"></div>
+                        </div>
+                        <div><label class="block font-bold text-slate-400 uppercase mb-1">Cover Image CDN Host URL Vector (Simulating imgBB Stream Output)</label><input type="text" x-model="wizardCover" class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2.5"></div>
+                        <div><label class="block font-bold text-slate-400 uppercase mb-1">Content Preview Abstract Body</label><textarea rows="3" x-model="wizardDescription" class="w-full bg-slate-50 dark:bg-slate-800 border rounded-xl p-2.5"></textarea></div>
+                    </div>
+                    <div class="flex justify-end gap-2 text-xs font-bold pt-2">
+                        <button @click="wizardOpen = false" class="px-4 py-2 border rounded-xl bg-slate-50">Cancel</button>
+                        <button @click="commitWizardPayload()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl">Commit Blueprint</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="bg-slate-900 text-slate-400 border-t border-slate-800 shrink-0">
+            <div class="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8 space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    <div class="space-y-3">
+                        <span class="text-white font-black text-lg tracking-wider">📚 Fable Hub</span>
+                        <p class="text-xs leading-relaxed text-slate-400">Democratizing literature sharing arrays globally through cryptographic access pipelines and high-fidelity verification architectures.</p>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-widest text-white mb-3">Quick Navigation Nodes</h4>
+                        <div class="flex flex-col space-y-1.5 text-xs">
+                            <a href="#" @click.prevent="pushToast('System background abstract documentation array parsed.', 'success')" class="hover:text-white">About Matrix Platform</a>
+                            <a href="#" @click.prevent="pushToast('Support tickets context routing enabled.', 'success')" class="hover:text-white">Contact Infrastructure Support</a>
+                            <a href="#" class="hover:text-white">Data Privacy Layer Policies</a>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-widest text-white mb-3">Ecosystem Social Bindings</h4>
+                        <div class="flex gap-2 text-xs font-bold">
+                            <a href="#" @click.prevent="pushToast('Dummy target redirect path tracking logged.', 'success')" class="p-2 bg-slate-800 rounded-lg hover:text-white">Twitter / X</a>
+                            <a href="#" @click.prevent="pushToast('Dummy target redirect path tracking logged.', 'success')" class="p-2 bg-slate-800 rounded-lg hover:text-white">GitHub Org</a>
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        <h4 class="text-xs font-bold uppercase tracking-widest text-white">Fable Communications Pipeline</h4>
+                        <p class="text-[11px] text-slate-500">Subscribe to monitor background data updates or catalog refresh sequences.</p>
+                        <form @submit.prevent="pushToast('Newsletter communication hooks updated inside state client context.', 'success')" class="flex gap-1.5">
+                            <input type="email" required placeholder="Address token..." class="bg-slate-800 border-0 rounded-xl px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-indigo-500 w-full">
+                            <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-3 rounded-xl">Join</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="pt-6 border-t border-slate-800 flex flex-col sm:flex-row justify-between text-[11px] text-slate-500 gap-4">
+                    <p>&copy; 2026 Fable Digital Ebook Exchange Group Systems. All permissions mapped to baseline evaluation frameworks.</p>
+                    <span class="font-mono bg-slate-950 px-3 py-1 rounded border border-slate-800">Status Node: Fully Synchronized</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        function fableEngine() {
+            return {
+                currentRoute: 'home',
+                dashboardTab: 'home',
+                globalLoading: false,
+                mobileMenuOpen: false,
+                darkMode: false,
+                toasts: [],
+                
+                genres: ['Fiction', 'Mystery', 'Romance', 'Sci-Fi', 'Fantasy', 'Horror'],
+                wishlist: ['eb-2'],
+                userPurchasedBookIds: ['eb-5'],
+
+                // Simulated Collections Database Structures
+                platformUsers: [
+                    { _id: 'u-admin', name: 'Albus Dumbledore', email: 'admin@fable.com', role: 'admin', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=150' },
+                    { _id: 'u-writer', name: 'Stephen King', email: 'writer@fable.com', role: 'writer', avatar: 'https://images.unsplash.com/photo-1519345182560-3f2917c472ef?q=80&w=150' },
+                    { _id: 'u-rowling', name: 'J.K. Rowling', email: 'rowling@fable.com', role: 'writer', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=150' },
+                    { _id: 'u-reader', name: 'Harry Potter', email: 'reader@fable.com', role: 'user', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=150' }
+                ],
+                platformWriters: [],
+                ebooks: [
+                    { _id: 'eb-1', title: 'The Shining Pipeline Errors', writer: 'u-writer', description: 'A horrific descriptive account of unexpected unhandled telemetry drops within critical database clusters.', price: 14.99, genre: 'Horror', coverImage: 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?q=80&w=400', dateUploaded: '2026-01-10', availability: 'available' },
+                    { _id: 'eb-2', title: 'Hogwarts Architecture Frameworks', writer: 'u-rowling', description: 'Comprehensive system diagrams tracking floating staircases structural routing nodes via stateless load balancers.', price: 21.50, genre: 'Fantasy', coverImage: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?q=80&w=400', dateUploaded: '2026-02-14', availability: 'available' },
+                    { _id: 'eb-3', title: 'Stateless Couplings Protocol', writer: 'u-writer', description: 'A gripping romantic novel detailing intense programmatic dependencies attempting to merge downstream.', price: 9.99, genre: 'Romance', coverImage: 'https://images.unsplash.com/photo-1516979187457-637abb4f9353?q=80&w=400', dateUploaded: '2026-03-22', availability: 'available' },
+                    { _id: 'eb-4', title: 'The Missing Semantics Query', writer: 'u-rowling', description: 'Mystery data streams logging index discrepancies that trigger un-indexed sequential disk scans across enterprise assets.', price: 18.00, genre: 'Mystery', coverImage: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?q=80&w=400', dateUploaded: '2026-04-05', availability: 'available' },
+                    { _id: 'eb-5', title: 'Chronicles of the Dark Fiber Link', writer: 'u-writer', description: 'High-concept sci-fi charting long-range space communications lines bypassing typical sub-space constraints.', price: 29.99, genre: 'Sci-Fi', coverImage: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?q=80&w=400', dateUploaded: '2026-05-19', availability: 'sold' },
+                    { _id: 'eb-6', title: 'The Abstract Factory Manifest', writer: 'u-rowling', description: 'Fiction based on real-world software design patterns taken to dangerous extremes inside automated micro-factories.', price: 12.45, genre: 'Fiction', coverImage: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=400', dateUploaded: '2026-06-01', availability: 'available' }
+                ],
+                transactions: [
+                    { transactionId: 'TX-901823481', type: 'publishing_fee', buyer: 'u-writer', ebook: null, amount: 25.00, createdAt: '2026-01-05' },
+                    { transactionId: 'TX-109238411', type: 'purchase', buyer: 'u-reader', ebook: 'eb-5', amount: 29.99, createdAt: '2026-05-20' },
+                    { transactionId: 'TX-483912039', type: 'publishing_fee', buyer: 'u-rowling', ebook: null, amount: 25.00, createdAt: '2026-02-01' }
+                ],
+
+                // Active App Context State Node Scopes
+                userSession: null, selectedEbook: null,
+                loginEmail: '', loginPassword: '',
+                regName: '', regEmail: '', regPassword: '', regConfirm: '', regRole: 'user',
+                browseSearchQuery: '', browseGenreFilter: '', browsePriceRange: 50, browseStockFilter: '', browseSortOrder: 'newest',
+                browseCurrentPage: 1, browseItemsPerPage: 4,
+
+                // Ebook Mutation State Fields Wizard
+                wizardOpen: false, wizardEditMode: false, wizardTargetId: null,
+                wizardTitle: '', wizardGenre: 'Fiction', wizardPrice: 15, wizardCover: '', wizardDescription: '',
+                pieChartObj: null, lineChartObj: null,
+
+                initPlatform() {
+                    this.platformWriters = this.platformUsers.filter(u => u.role === 'writer');
+                },
+                navigateTo(route) {
+                    this.globalLoading = true;
+                    this.currentRoute = route;
+                    setTimeout(() => {
+                        this.globalLoading = false;
+                        if(route === 'dashboard') {
+                            this.$nextTick(() => { this.renderDashboardCharts(); });
+                        }
+                    }, 350);
+                },
+                pushToast(message, type = 'success') {
+                    const id = Date.now();
+                    this.toasts.push({ id, message, type });
+                    setTimeout(() => { this.toasts = this.toasts.filter(t => t.id !== id); }, 4000);
+                },
+                toggleDarkMode() {
+                    this.darkMode = !this.darkMode;
+                },
+                submitLogin() {
+                    if(this.loginEmail === 'admin@fable.com' && this.loginPassword === 'Admin@123') {
+                        this.userSession = this.platformUsers.find(u => u.email === 'admin@fable.com');
+                    } else if(this.loginEmail === 'writer@fable.com' && this.loginPassword === 'writer123') {
+                        this.userSession = this.platformUsers.find(u => u.email === 'writer@fable.com');
+                    } else {
+                        const matched = this.platformUsers.find(u => u.email === this.loginEmail);
+                        if(matched) this.userSession = matched;
+                        else {
+                            this.pushToast("API Error: Credentials authentication failed. Invalid token signatures.", "error");
+                            return;
+                        }
+                    }
+                    this.pushToast(`Session JWT issued. Authentication validated for ${this.userSession.name}. Node expires in 7 days.`);
+                    this.navigateTo(this.userSession.role === 'user' ? 'home' : 'dashboard');
+                },
+                triggerBetterAuthOAuth() {
+                    this.userSession = this.platformUsers.find(u => u.role === 'admin');
+                    this.pushToast("BetterAuth context handshakes successful. Access scopes active.");
+                    this.navigateTo('dashboard');
+                },
+                submitRegister() {
+                    if(this.regPassword !== this.regConfirm) {
+                        this.pushToast("Validation Error: Core password signatures mismatched.", "error");
+                        return;
+                    }
+                    const newUser = {
+                        _id: 'u-' + Date.now(),
+                        name: this.regName,
+                        email: this.regEmail,
+                        role: this.regRole,
+                        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150'
+                    };
+                    this.platformUsers.push(newUser);
+                    if(newUser.role === 'writer') this.platformWriters.push(newUser);
+                    this.userSession = newUser;
+                    this.pushToast("Database entry committed. Authorization token generated safely.");
+                    this.navigateTo('home');
+                },
+                logout() {
+                    this.userSession = null;
+                    this.pushToast("Client session token invalidated. LocalStorage cache state cleared.");
+                    this.navigateTo('home');
+                },
+                viewEbookDetails(id) {
+                    this.selectedEbook = this.ebooks.find(b => b._id === id);
+                    if(this.selectedEbook) this.navigateTo('ebook-details');
+                    else this.pushToast("Runtime error: Target ID document not found inside local ledger structures.", "error");
+                },
+
+                // Filter & Sort Logic Pipelines
+                getFilteredEbooks() {
+                    return this.ebooks.filter(b => {
+                        const titleMatch = b.title.toLowerCase().includes(this.browseSearchQuery.toLowerCase()) ||
+                                           this.getWriterName(b.writer).toLowerCase().includes(this.browseSearchQuery.toLowerCase());
+                        const genreMatch = this.browseGenreFilter === '' || b.genre === this.browseGenreFilter;
+                        const priceMatch = b.price <= this.browsePriceRange;
+                        const stockMatch = this.browseStockFilter === '' || b.availability === this.browseStockFilter;
+                        return titleMatch && genreMatch && priceMatch && stockMatch;
+                    }).sort((a,b) => {
+                        if(this.browseSortOrder === 'low-high') return a.price - b.price;
+                        if(this.browseSortOrder === 'high-low') return b.price - a.price;
+                        return b._id.localeCompare(a._id);
+                    });
+                },
+                getPaginatedEbooks() {
+                    const out = this.getFilteredEbooks();
+                    const start = (this.browseCurrentPage - 1) * this.browseItemsPerPage;
+                    return out.slice(start, start + this.browseItemsPerPage);
+                },
+                getTotalPages() { return Math.ceil(this.getFilteredEbooks().length / this.browseItemsPerPage) || 1; },
+                resetFilters() {
+                    this.browseSearchQuery = ''; this.browseGenreFilter = ''; this.browsePriceRange = 50; this.browseStockFilter = ''; this.browseCurrentPage = 1;
+                },
+
+                // Helper Utilities
+                getWriterName(id) { const u = this.platformUsers.find(x => x._id === id); return u ? u.name : 'Unknown Independent Author'; },
+                getEbookObject(id) { return this.ebooks.find(x => x._id === id); },
+                getUserObject(id) { return this.platformUsers.find(x => x._id === id); },
+                getGrossRevenue() { return this.transactions.reduce((acc, t) => acc + t.amount, 0).toFixed(2); },
+                
+                toggleWishlist(id) {
+                    if(this.wishlist.includes(id)) this.wishlist = this.wishlist.filter(x => x !== id);
+                    else this.wishlist.push(id);
+                },
+                executeStripeSimulation(book) {
+                    if(!this.userSession) { this.pushToast("Validation error: Identity session required to proceed with Stripe checkout payloads.", "error"); this.navigateTo('login'); return; }
+                    this.globalLoading = true;
+                    setTimeout(() => {
+                        this.transactions.push({
+                            transactionId: 'TX-' + Math.floor(Math.random() * 899999 + 100000),
+                            type: 'purchase', buyer: this.userSession._id, ebook: book._id, amount: book.price, createdAt: '2026-06-29'
+                        });
+                        this.userPurchasedBookIds.push(book._id);
+                        book.availability = 'sold';
+                        this.globalLoading = false;
+                        this.pushToast(`Stripe payment clearing confirmed for transaction volume tracking chains! Access active.`);
+                        this.navigateTo('dashboard'); this.dashboardTab = 'user-library';
+                    }, 1000);
+                },
+
+                // Dashboard Component Mutators
+                getUserPurchasedEbooks() { return this.ebooks.filter(b => this.userPurchasedBookIds.includes(b._id)); },
+                getWriterOwnedEbooks() { return this.ebooks.filter(b => b.writer === this.userSession?._id); },
+                getWriterSalesTransactions() {
+                    const ownedIds = this.getWriterOwnedEbooks().map(b => b._id);
+                    return this.transactions.filter(t => t.type === 'purchase' && ownedIds.includes(t.ebook));
+                },
+                reassignUserPermissionRole(userId, targetRole) {
+                    const u = this.platformUsers.find(x => x._id === userId);
+                    if(u) { u.role = targetRole; this.pushToast(`Permission parameters escalated for execution contexts node [${targetRole}].`); this.initPlatform(); }
+                },
+                purgePlatformUserNode(id) {
+                    this.platformUsers = this.platformUsers.filter(x => x._id !== id);
+                    this.pushToast("Identity payload dropped from database clusters.", "error");
+                    this.initPlatform();
+                },
+                launchAssetWizard(book = null) {
+                    if(book) {
+                        this.wizardEditMode = true; this.wizardTargetId = book._id; this.wizardTitle = book.title;
+                        this.wizardGenre = book.genre; this.wizardPrice = book.price; this.wizardCover = book.coverImage; this.wizardDescription = book.description;
+                    } else {
+                        this.wizardEditMode = false; this.wizardTitle = ''; this.wizardGenre = 'Fiction'; this.wizardPrice = 12;
+                        this.wizardCover = 'https://images.unsplash.com/photo-1541963463532-d68292c34b19?q=80&w=400'; this.wizardDescription = '';
+                    }
+                    this.wizardOpen = true;
+                },
+                commitWizardPayload() {
+                    if(this.wizardEditMode) {
+                        const target = this.ebooks.find(x => x._id === this.wizardTargetId);
+                        if(target) { target.title = this.wizardTitle; target.genre = this.wizardGenre; target.price = Number(this.wizardPrice); target.coverImage = this.wizardCover; target.description = this.wizardDescription; }
+                    } else {
+                        this.ebooks.push({
+                            _id: 'eb-' + Date.now(), title: this.wizardTitle, writer: this.userSession._id, description: this.wizardDescription,
+                            price: Number(this.wizardPrice), genre: this.wizardGenre, coverImage: this.wizardCover, dateUploaded: '2026-06-29', availability: 'available'
+                        });
+                    }
+                    this.wizardOpen = false;
+                    this.pushToast("Data collection mutation execution committed successfully to storage grids.");
+                },
+                purgeEbookDataRecord(id) {
+                    this.ebooks = this.ebooks.filter(x => x._id !== id);
+                    this.pushToast("Ebook record context purged from registry matrices.", "error");
+                },
+
+                // Charts Rendering Logic Engine
+                renderDashboardCharts() {
+                    if(this.pieChartObj) this.pieChartObj.destroy();
+                    if(this.salesChartObj) this.salesChartObj.destroy();
+                    const counts = {}; this.ebooks.forEach(b => { counts[b.genre] = (counts[b.genre] || 0) + 1; });
+                    const pieCtx = document.getElementById('genrePieChart')?.getContext('2d');
+                    if(pieCtx) {
+                        this.pieChartObj = new Chart(pieCtx, {
+                            type: 'pie', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#4f46e5', '#10b981', '#f59e0b', '#3b82f6', '#ec4899', '#ef4444'] }] },
+                            options: { responsive: true, plugins: { legend: { display: false } } }
+                        });
+                    }
+                    const lineCtx = document.getElementById('salesLineChart')?.getContext('2d');
+                    if(lineCtx) {
+                        this.salesChartObj = new Chart(lineCtx, {
+                            type: 'line', data: { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], datasets: [{ label: 'Gross Clearing Metrics ($)', data: [110, 240, 310, 290, 410, Number(this.getGrossRevenue())], borderColor: '#4f46e5', fill: false, tension: 0.2 }] },
+                            options: { responsive: true }
+                        });
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
