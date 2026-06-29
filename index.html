@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InkShare - Discover & Read Original Ebooks</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .smooth-transition { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans antialiased" x-data="{ 
+    currentTab: 'home', 
+    mobileMenuOpen: false, 
+    authModalOpen: false, 
+    authMode: 'login', 
+    roleSelectionOpen: false,
+    isLoggedIn: false,
+    userRole: 'Guest',
+    searchQuery: '',
+    genreFilter: 'All',
+    sortBy: 'latest'
+}">
+
+    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0 flex items-center cursor-pointer" @click="currentTab = 'home'">
+                    <i data-lucide="book-open" class="h-8 w-8 text-indigo-600 mr-2"></i>
+                    <span class="font-bold text-xl tracking-tight bg-gradient-to-r gold from-indigo-600 to-purple-600 bg-clip-text text-transparent">InkShare</span>
+                </div>
+
+                <div class="hidden md:flex items-center space-x-8">
+                    <button @click="currentTab = 'home'" :class="currentTab === 'home' ? 'text-indigo-600 font-semibold border-b-2 border-indigo-600' : 'text-gray-600 hover:text-indigo-600'" class="pb-1 transition-colors">Home</button>
+                    <button @click="currentTab = 'browse'" :class="currentTab === 'browse' ? 'text-indigo-600 font-semibold border-b-2 border-indigo-600' : 'text-gray-600 hover:text-indigo-600'" class="pb-1 transition-colors">Browse Ebooks</button>
+                    <button x-show="isLoggedIn" @click="currentTab = 'dashboard'" :class="currentTab === 'dashboard' ? 'text-indigo-600 font-semibold border-b-2 border-indigo-600' : 'text-gray-600 hover:text-indigo-600'" class="pb-1 transition-colors" x-cloak>Dashboard</button>
+                </div>
+
+                <div class="hidden md:flex items-center space-x-4">
+                    <template x-if="!isLoggedIn">
+                        <div class="flex items-center space-x-3">
+                            <button @click="authMode = 'login'; authModalOpen = true" class="text-sm font-medium text-gray-700 hover:text-indigo-600 transition">Log in</button>
+                            <button @click="authMode = 'register'; authModalOpen = true" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition">Sign up</button>
+                        </div>
+                    </template>
+                    <template x-if="isLoggedIn">
+                        <div class="flex items-center space-x-4">
+                            <span class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-medium border border-indigo-100" x-text="`Role: ${userRole}`"></span>
+                            <button @click="isLoggedIn = false; userRole = 'Guest'; currentTab = 'home'" class="flex items-center text-sm font-medium text-red-600 hover:text-red-700 transition">
+                                <i data-lucide="log-out" class="w-4 h-4 mr-1"></i> Logout
+                            </button>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="flex md:hidden">
+                    <button @click="mobileMenuOpen = !mobileMenuOpen" class="text-gray-600 hover:text-gray-900 focus:outline-none">
+                        <i data-lucide="menu" x-show="!mobileMenuOpen" class="h-6 w-6"></i>
+                        <i data-lucide="x" x-show="mobileMenuOpen" class="h-6 w-6" x-cloak></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="mobileMenuOpen" x-transition class="md:hidden bg-white border-b border-gray-200" x-cloak>
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <button @click="currentTab = 'home'; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50">Home</button>
+                <button @click="currentTab = 'browse'; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50">Browse Ebooks</button>
+                <button x-show="isLoggedIn" @click="currentTab = 'dashboard'; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50" x-cloak>Dashboard</button>
+                
+                <hr class="my-2 border-gray-200">
+                
+                <template x-if="!isLoggedIn">
+                    <div class="space-y-1">
+                        <button @click="authMode = 'login'; authModalOpen = true; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:bg-gray-50">Log in</button>
+                        <button @click="authMode = 'register'; authModalOpen = true; mobileMenuOpen = false" class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-indigo-600 hover:bg-indigo-50">Sign up</button>
+                    </div>
+                </template>
+                <template x-if="isLoggedIn">
+                    <div class="px-3 py-2 space-y-2">
+                        <div class="text-xs text-gray-500" x-text="`Logged in as: ${userRole}`"></div>
+                        <button @click="isLoggedIn = false; userRole = 'Guest'; mobileMenuOpen = false; currentTab = 'home'" class="flex items-center text-base font-medium text-red-600">
+                            <i data-lucide="log-out" class="w-5 h-5 mr-2"></i> Logout
+                        </button>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </nav>
+
+    <main class="min-h-[calc(100vh-16rem)]">
+        
+        <div x-show="currentTab === 'home'" x-transition:enter="transition ease-out duration-500" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+            
+            <div class="relative bg-gray-900 h-[450px] md:h-[550px] overflow-hidden" x-data="{ 
+                activeSlide: 1,
+                slides: [
+                    { id: 1, tag: 'Discover & Read Original Ebooks', title: 'Your Digital Gateway to Endless Stories', desc: 'Connect with thousands of global writers sharing rare and authentic web creations.', bg: 'from-purple-900 to-indigo-900' },
+                    { id: 2, tag: 'Empower Independent Creators', title: 'Write, Publish, & Earn Direct Royalties', desc: 'Seamlessly shift your reader account to a writer profile to start monetization steps instantly.', bg: 'from-indigo-900 to-blue-900' }
+                ]
+            }" x-init="setInterval(() => { activeSlide = activeSlide === 1 ? 2 : 1 }, 6000)">
+                
+                <template x-for="slide in slides" :key="slide.id">
+                    <div x-show="activeSlide === slide.id" 
+                         x-transition:enter="transition ease-in-out duration-700 transform"
+                         x-transition:enter-start="opacity-0 translate-x-full"
+                         x-transition:enter-end="opacity-100 translate-x-0"
+                         x-transition:leave="transition ease-in-out duration-700 transform"
+                         x-transition:leave-start="opacity-100 translate-x-0"
