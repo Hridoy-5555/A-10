@@ -150,3 +150,98 @@ export default function AnimatedNav() {
     </motion.nav>
   );
 }
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const sliderAssets = [
+  {
+    id: 1,
+    title: "The Digital Literature Revolution",
+    subtitle: "Connecting raw source manuscripts with immediate global audience networks instantly.",
+    image: "https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=1600"
+  },
+  {
+    id: 2,
+    title: "Secure Intellectual Property Rights",
+    subtitle: "Protecting independent creative ledger systems utilizing institutional encryption models.",
+    image: "https://images.unsplash.com/photo-1516979187457-637abb4f9353?w=1600"
+  }
+];
+
+export function HeroCarousel() {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const slideTimer = setInterval(() => {
+      setIndex((prevIndex) => (prevIndex + 1) % sliderAssets.length);
+    }, 6000);
+    return () => clearInterval(slideTimer);
+  }, []);
+
+  return (
+    <div class="relative w-full h-[460px] md:h-[580px] bg-slate-950 overflow-hidden group">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={index}
+          initial={{ opacity: 0, scale: 1.02 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.8, ease: "easeInOut" }}
+          class="absolute inset-0 w-full h-full"
+        >
+          {/* IMAGE LAYER */}
+          <img 
+            src={sliderAssets[index].image} 
+            alt={sliderAssets[index].title}
+            class="w-full h-full object-cover opacity-35 filter contrast-125 select-none"
+          />
+          {/* PREMIUM DEEP VIGNETTE GRADIENT OVERLAY FILL ARCHITECTURE */}
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-slate-950/60" />
+
+          {/* CAROUSEL GRAPHIC LABELS CONTAINER */}
+          <div class="absolute inset-0 flex items-center justify-center text-center px-4">
+            <div class="max-w-4xl mx-auto space-y-6">
+              <motion.h2 
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.5 }}
+                class="text-3xl md:text-6xl font-black text-white tracking-tight leading-tight"
+              >
+                {sliderAssets[index].title}
+              </motion.h2>
+              <motion.p 
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+                class="text-base md:text-xl text-slate-300 font-light max-w-2xl mx-auto"
+              >
+                {sliderAssets[index].subtitle}
+              </motion.p>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.6 }}
+                class="pt-4"
+              >
+                <a href="/browse" class="inline-flex bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm px-8 py-4 rounded-xl shadow-lg shadow-indigo-600/20 transition-transform transform hover:-translate-y-0.5">
+                  Browse Global Ebooks
+                </a>
+              </motion.div>
+            </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+
+      {/* DYNAMIC PAGINATION CAROUSEL TICKERS */}
+      <div class="absolute bottom-6 left-0 right-0 flex items-center justify-center gap-2.5 z-20">
+        {sliderAssets.map((_, dotIdx) => (
+          <button
+            key={dotIdx}
+            onClick={() => setIndex(dotIdx)}
+            class={`h-1.5 transition-all duration-300 rounded-full ${index === dotIdx ? 'w-8 bg-indigo-500' : 'w-2 bg-slate-700 hover:bg-slate-500'}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
