@@ -69,3 +69,38 @@ exports.createCheckoutSession = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+
+export default function SmoothNavBar() {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const navItems = ['Home', 'Browse', 'Writers', 'Dashboard'];
+
+  return (
+    <nav class="flex items-center space-x-1 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm w-fit">
+      {navItems.map((item, index) => (
+        <a
+          key={item}
+          href="#"
+          onMouseEnter={() => setHoveredIndex(index)}
+          onMouseLeave={() => setHoveredIndex(null)}
+          class="relative px-4 py-2 text-sm font-semibold text-slate-600 hover:text-indigo-600 transition-colors duration-300"
+        >
+          {/* Dynamic Sliding Background Pill */}
+          {hoveredIndex === index && (
+            <motion.span
+              layoutId="navHoverPill"
+              class="absolute inset-0 bg-indigo-50 rounded-xl z-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ type: "spring", stiffness: 350, damping: 30 }}
+            />
+          )}
+          {/* Ensure text remains above the sliding background z-index layer */}
+          <span class="relative z-10">{item}</span>
+        </a>
+      ))}
+    </nav>
+  );
+}
